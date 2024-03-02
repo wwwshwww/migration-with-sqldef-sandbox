@@ -1,4 +1,19 @@
 version: '3'
 
+# for local development
+# TODO: 各固定値の変数化 or CI/CD設計時に根本から見直し
+
 tasks:
+  sqldef:build:
+    cmds:
+      - docker build -t psqldef-runner --no-cache ./tool/psqldef 
+  sqldef:test:
+    cmds:
+      - docker run --rm -it --network postgres_db-local -v $(pwd)/tool/psqldef:/mo psqldef-runner sh -c "psqldef -h postgres-sample-db-1 -U root -W root test_db --dry-run < mo/test.sql"
+  db:up:
+    cmds:
+      - docker compose -f "tool/postgres/docker-compose-local.yml" up -d --build
+  db:for-sqldef-test:
+    cmds:
+      - docker compose -f "tool/postgres/docker-compose-local.yml" exec sample-db sh -c "psql -U root -h localhost -c \"CREATE DATABASE test_db\""
   

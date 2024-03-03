@@ -9,9 +9,10 @@ services:
       POSTGRES_USER: root
       POSTGRES_PASSWORD: root
     networks:
-      - db-local
+      - local-dayo
     ports:
       - 5432:5432
 
 networks:
-  db-local:
+  local-dayo:
+    name: ${DB_NETWORK_NAME:-you-need-to-set-env}

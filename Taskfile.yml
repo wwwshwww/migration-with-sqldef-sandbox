@@ -1,19 +1,26 @@
 version: '3'
 
 # for local development
-# TODO: 各固定値の変数化 or CI/CD設計時に根本から見直し
+# TODO: CI/CD設計時に根本から見直し
+
+vars:
+  DB_NETWORK_NAME: 
+    sh: echo $DB_NETWORK_NAME
+  DB_SERVICE_NAME: sample-db
+  SQLDEF_IMAGE_TAG: psqldef-runner
+  SQLDEF_TEST_DB_NAME: tameshi
 
 tasks:
   sqldef:build:
     cmds:
-      - docker build -t psqldef-runner --no-cache ./tool/psqldef 
+      - docker build -t {{.SQLDEF_IMAGE_TAG}} --no-cache ./tool/psqldef 
   sqldef:test:
     cmds:
-      - docker run --rm -it --network postgres_db-local -v $(pwd)/tool/psqldef:/mo psqldef-runner sh -c "psqldef -h postgres-sample-db-1 -U root -W root test_db --dry-run < mo/test.sql"
+      - docker run --rm -it --network {{.DB_NETWORK_NAME}} -v $(pwd)/tool/psqldef:/mo {{.SQLDEF_IMAGE_TAG}} sh -c "psqldef -h {{.DB_SERVICE_NAME}} -U root -W root {{.SQLDEF_TEST_DB_NAME}} --dry-run < mo/test.sql"
   db:up:
     cmds:
       - docker compose -f "tool/postgres/docker-compose-local.yml" up -d --build
   db:for-sqldef-test:
     cmds:
-      - docker compose -f "tool/postgres/docker-compose-local.yml" exec sample-db sh -c "psql -U root -h localhost -c \"CREATE DATABASE test_db\""
+      - docker compose -f "tool/postgres/docker-compose-local.yml" exec {{.DB_SERVICE_NAME}} sh -c "psql -U root -h localhost -c \"CREATE DATABASE {{.SQLDEF_TEST_DB_NAME}}\""
   

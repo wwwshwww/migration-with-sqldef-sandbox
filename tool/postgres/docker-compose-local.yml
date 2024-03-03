@@ -6,6 +6,7 @@ services:
     image: postgres:16.2
     restart: always
     environment:
+      POSTGRES_DB: ${DB_NAME:-must_set_env}
       POSTGRES_USER: root
       POSTGRES_PASSWORD: root
     networks:
@@ -15,4 +16,4 @@ services:
 
 networks:
   local-dayo:
-    name: ${DB_NETWORK_NAME:-you-need-to-set-env}
+    name: ${DB_NETWORK_NAME:-must-set-env}

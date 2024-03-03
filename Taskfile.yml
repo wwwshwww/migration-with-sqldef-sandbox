@@ -6,9 +6,13 @@ version: '3'
 vars:
   DB_NETWORK_NAME: 
     sh: echo $DB_NETWORK_NAME
+  DB_NAME: 
+    sh: echo $DB_NAME
+  DB_SCHEMA_PATH:
+    sh: echo $(pwd)/tool/postgres/schema.sql
   DB_SERVICE_NAME: sample-db
   SQLDEF_IMAGE_TAG: psqldef-runner
-  SQLDEF_TEST_DB_NAME: tameshi
+  
 
 tasks:
   sqldef:build:
@@ -16,11 +20,20 @@ tasks:
       - docker build -t {{.SQLDEF_IMAGE_TAG}} --no-cache ./tool/psqldef 
   sqldef:test:
     cmds:
-      - docker run --rm -it --network {{.DB_NETWORK_NAME}} -v $(pwd)/tool/psqldef:/mo {{.SQLDEF_IMAGE_TAG}} sh -c "psqldef -h {{.DB_SERVICE_NAME}} -U root -W root {{.SQLDEF_TEST_DB_NAME}} --dry-run < mo/test.sql"
-  db:up:
+      - docker run --rm -it --network {{.DB_NETWORK_NAME}} -v $(pwd)/tool/psqldef/test.sql:/test.sql {{.SQLDEF_IMAGE_TAG}} sh -c "psqldef -h {{.DB_SERVICE_NAME}} -U root -W root {{.DB_NAME}} --dry-run < /test.sql"
+  db:init:
     cmds:
-      - docker compose -f "tool/postgres/docker-compose-local.yml" up -d --build
-  db:for-sqldef-test:
+      - docker compose -f "./tool/postgres/docker-compose-local.yml" up -d --build
+  # db:for-sqldef-test:
+  #   cmds:
+  #     - docker compose -f "tool/postgres/docker-compose-local.yml" exec {{.DB_SERVICE_NAME}} sh -c "psql -U root -h localhost -c \"CREATE DATABASE {{.SQLDEF_TEST_DB_NAME}}\""
+  db:dump:
     cmds:
-      - docker compose -f "tool/postgres/docker-compose-local.yml" exec {{.DB_SERVICE_NAME}} sh -c "psql -U root -h localhost -c \"CREATE DATABASE {{.SQLDEF_TEST_DB_NAME}}\""
+      - docker run --rm -it --network {{.DB_NETWORK_NAME}} {{.SQLDEF_IMAGE_TAG}} sh -c "psqldef -h {{.DB_SERVICE_NAME}} -U root -W root {{.DB_NAME}} --export"
+  db:dryrun:
+    cmds:
+      - docker run --rm -it --network {{.DB_NETWORK_NAME}} -v {{.DB_SCHEMA_PATH}}:/schema.sql {{.SQLDEF_IMAGE_TAG}} sh -c "psqldef -h {{.DB_SERVICE_NAME}} -U root -W root {{.DB_NAME}} --dry-run --enable-drop-table < schema.sql"
+  db:apply:
+    cmds:
+      - docker run --rm -it --network {{.DB_NETWORK_NAME}} -v {{.DB_SCHEMA_PATH}}:/schema.sql {{.SQLDEF_IMAGE_TAG}} sh -c "psqldef -h {{.DB_SERVICE_NAME}} -U root -W root {{.DB_NAME}} --enable-drop-table < schema.sql"
   

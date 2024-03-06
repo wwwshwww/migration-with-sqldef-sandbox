@@ -1,5 +1,5 @@
 # メモ
-SQLDEF の自動マイグレーション実行に失敗するケースが存在する。例えば、特定のカラムの型を VARCHAR から UUID に変更するパターンなど。
+注意：sqldef の自動マイグレーション実行に失敗するケースが存在する。例えば、特定のカラムの型を VARCHAR から UUID に変更するパターンなど。
 ```
 >> ALTER TABLE "public"."users" ALTER COLUMN "id" TYPE uuid;
 

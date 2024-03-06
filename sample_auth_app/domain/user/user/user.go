@@ -1,7 +1,7 @@
 package user
 
 import (
-	"example_app/sample_auth_app/domain_service/password_hasher"
+	"example_app/sample_auth_app/domain_service/secure_hasher"
 
 	"github.com/go-errors/errors"
 )
@@ -9,10 +9,10 @@ import (
 type User interface {
 	ID() ID
 	Name() Name
-	HashedPassword() string
+	HashedPassword() string // 不可逆圧縮情報、平文との比較は可能
 
 	ChangeName(Name) error
-	ChangePassword(Password, password_hasher.PasswordHasher) error
+	ChangePassword(Password, secure_hasher.SecureHasher) error
 }
 
 type user struct {
@@ -42,7 +42,7 @@ func (e *user) ChangeName(v Name) error {
 	return nil
 }
 
-func (e *user) ChangePassword(newPassword Password, passwordHasher password_hasher.PasswordHasher) error {
+func (e *user) ChangePassword(newPassword Password, passwordHasher secure_hasher.SecureHasher) error {
 	hashedPassword, err := passwordHasher.Hash(newPassword.Primitive())
 	if err != nil {
 		return errors.Wrap(err, 1)

@@ -5,7 +5,7 @@ import (
 	"example_app/sample_auth_app/domain/session/session"
 	"example_app/sample_auth_app/domain/user/user"
 	"example_app/sample_auth_app/domain/user/user_finder"
-	"example_app/sample_auth_app/domain_service/password_hasher"
+	"example_app/sample_auth_app/domain_service/secure_hasher"
 	"time"
 
 	"github.com/go-errors/errors"
@@ -17,11 +17,11 @@ type Usecase interface {
 }
 
 type usecase struct {
-	ctx                   context.Context
-	userRepository        user.Repository
-	userFinder            user_finder.Finder
-	sessionRepository     session.Repository
-	passwordHasherService password_hasher.PasswordHasher
+	ctx                 context.Context
+	userRepository      user.Repository
+	userFinder          user_finder.Finder
+	sessionRepository   session.Repository
+	secureHasherService secure_hasher.SecureHasher
 }
 
 func New(ctx context.Context, userRepository user.Repository) Usecase {
@@ -41,7 +41,7 @@ func (uc *usecase) SignUp(input SignUpInput) error {
 	if err != nil {
 		return errors.Wrap(err, 1)
 	}
-	hashedPassword, err := uc.passwordHasherService.Hash(password.Primitive())
+	hashedPassword, err := uc.secureHasherService.Hash(password.Primitive())
 	if err != nil {
 		return errors.Wrap(err, 1)
 	}
@@ -82,26 +82,21 @@ func (uc *usecase) SignIn(input SignInInput) (SessionInfo, error) {
 		return SessionInfo{}, errors.WrapPrefix(err, "Failed to get user", 1)
 	}
 	loginUser := loginUsers[0]
-	if !uc.passwordHasherService.IsSame(loginUser.HashedPassword(), inputPassword.Primitive()) {
+	if !uc.secureHasherService.IsSame(loginUser.HashedPassword(), inputPassword.Primitive()) {
 		return SessionInfo{}, errors.New("Wrong password")
 	}
 
-	sId := session.GenerateID()
-	sToken, err := session.GenerateToken()
+	s, sToken, err := session.Generate(loginUserID, time.Now(), uc.secureHasherService)
 	if err != nil {
-		return SessionInfo{}, errors.WrapPrefix(err, "Failed to generate session token", 1)
+		return SessionInfo{}, errors.WrapPrefix(err, "Failed to generate session", 1)
 	}
-	ss, err := session.New(sId, loginUserID, sToken, time.Now(), time.Now())
-	if err != nil {
-		return SessionInfo{}, errors.WrapPrefix(err, "Failed to create session", 1)
-	}
-	if err := uc.sessionRepository.BulkSave([]session.Session{ss}); err != nil {
+	if err := uc.sessionRepository.BulkSave([]session.Session{s}); err != nil {
 		return SessionInfo{}, errors.WrapPrefix(err, "Failed to save session", 1)
 	}
 	return SessionInfo{
-		Id:        ss.ID().Primitive(),
-		Token:     ss.Token().Primitive(),
-		CreatedAt: ss.CreatedAt(),
-		ExpiresAt: ss.ExpiresAt(),
+		Id:        s.ID().Primitive(),
+		Token:     sToken.Primitive(),
+		CreatedAt: s.CreatedAt(),
+		ExpiresAt: s.ExpiresAt(),
 	}, nil
 }

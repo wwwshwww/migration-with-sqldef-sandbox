@@ -1,24 +1,28 @@
 package user
 
-import "github.com/go-errors/errors"
+import (
+	"example_app/sample_auth_app/domain_service/password_hasher"
+
+	"github.com/go-errors/errors"
+)
 
 type User interface {
 	ID() ID
 	Name() Name
-	Password() Password
+	HashedPassword() string
 
 	ChangeName(Name) error
-	ChangePassword(Password) error
+	ChangePassword(Password, password_hasher.PasswordHasher) error
 }
 
 type user struct {
-	id       ID
-	name     Name
-	password Password
+	id             ID
+	name           Name
+	hashedPassword string
 }
 
-func New(i ID, n Name, p Password) (User, error) {
-	return &user{id: i, name: n, password: p}, nil
+func New(i ID, n Name, hashedPassword string) (User, error) {
+	return &user{id: i, name: n, hashedPassword: hashedPassword}, nil
 }
 
 func (e *user) ID() ID {
@@ -29,8 +33,8 @@ func (e *user) Name() Name {
 	return e.name
 }
 
-func (e *user) Password() Password {
-	return e.password
+func (e *user) HashedPassword() string {
+	return e.hashedPassword
 }
 
 func (e *user) ChangeName(v Name) error {
@@ -38,10 +42,11 @@ func (e *user) ChangeName(v Name) error {
 	return nil
 }
 
-func (e *user) ChangePassword(v Password) error {
-	if e.password.Equal(v) {
-		return errors.New("New password must be different from old one")
+func (e *user) ChangePassword(newPassword Password, passwordHasher password_hasher.PasswordHasher) error {
+	hashedPassword, err := passwordHasher.Hash(newPassword.Primitive())
+	if err != nil {
+		return errors.Wrap(err, 1)
 	}
-	e.password = v
+	e.hashedPassword = hashedPassword
 	return nil
 }

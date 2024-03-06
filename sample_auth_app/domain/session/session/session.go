@@ -22,8 +22,10 @@ type Session interface {
 	ActivitiesAt() time.Time
 	ExpiresAt() time.Time
 
-	UpdateActivity(time.Time)
-	IsExpired(time.Time) bool
+	UpdateActivity(activitiesAt time.Time)
+	Invalidate(now time.Time)
+
+	IsValid(now time.Time) bool
 }
 
 type session struct {
@@ -32,11 +34,15 @@ type session struct {
 	hashedToken  string
 	createdAt    time.Time
 	activitiesAt time.Time
+	expiresAt    time.Time
 }
 
-func New(i ID, u user.ID, hashedToken string, createdAt, activitiesAt time.Time) (Session, error) {
+func New(i ID, u user.ID, hashedToken string, createdAt, activitiesAt, expiresAt time.Time) (Session, error) {
 	if activitiesAt.Before(createdAt) {
 		return nil, errors.New("Invalid period")
+	}
+	if expiresAt.Sub(createdAt) > LifeSpan {
+		return nil, errors.New("too long period")
 	}
 	return &session{
 		id:           i,
@@ -44,6 +50,7 @@ func New(i ID, u user.ID, hashedToken string, createdAt, activitiesAt time.Time)
 		hashedToken:  hashedToken,
 		createdAt:    createdAt,
 		activitiesAt: activitiesAt,
+		expiresAt:    expiresAt,
 	}, nil
 }
 
@@ -58,7 +65,7 @@ func Generate(u user.ID, now time.Time, hasher secure_hasher.SecureHasher) (Sess
 		return nil, nil, errors.New("failed to hash Token")
 	}
 
-	s, err := New(id, u, hashedToken, now, now)
+	s, err := New(id, u, hashedToken, now, now, now.Add(ExpiresDuration))
 	if err != nil {
 		return nil, nil, errors.New("failed to create session")
 	}
@@ -81,15 +88,23 @@ func (e *session) ActivitiesAt() time.Time {
 	return e.activitiesAt
 }
 func (e *session) ExpiresAt() time.Time {
+	return e.expiresAt
+}
+
+func (e *session) UpdateActivity(activitiesAt time.Time) {
+	e.activitiesAt = activitiesAt
+
 	expectedExpiresAt := e.activitiesAt.Add(ExpiresDuration)
 	if total := expectedExpiresAt.Sub(e.createdAt); total > LifeSpan {
-		return e.ActivitiesAt().Add(LifeSpan - e.activitiesAt.Sub(e.createdAt))
+		e.expiresAt = e.ActivitiesAt().Add(LifeSpan - e.activitiesAt.Sub(e.createdAt))
+	} else {
+		e.expiresAt = expectedExpiresAt
 	}
-	return expectedExpiresAt
 }
-func (e *session) UpdateActivity(now time.Time) {
+func (e *session) Invalidate(now time.Time) {
+	e.expiresAt = now
 	e.activitiesAt = now
 }
-func (e *session) IsExpired(now time.Time) bool {
-	return now.After(e.ExpiresAt())
+func (e *session) IsValid(now time.Time) bool {
+	return now.Before(e.expiresAt)
 }

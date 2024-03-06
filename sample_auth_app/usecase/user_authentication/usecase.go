@@ -1,7 +1,7 @@
 package user_authentication
 
 import (
-	"context"
+	"example_app/sample_auth_app/common/mycontext"
 	"example_app/sample_auth_app/domain/session/session"
 	"example_app/sample_auth_app/domain/user/user"
 	"example_app/sample_auth_app/domain/user/user_finder"
@@ -14,17 +14,18 @@ import (
 type Usecase interface {
 	SignUp(SignUpInput) error
 	SignIn(SignInInput) (SessionInfo, error)
+	SignOut() error
 }
 
 type usecase struct {
-	ctx                 context.Context
+	ctx                 mycontext.Context
 	userRepository      user.Repository
 	userFinder          user_finder.Finder
 	sessionRepository   session.Repository
 	secureHasherService secure_hasher.SecureHasher
 }
 
-func New(ctx context.Context, userRepository user.Repository) Usecase {
+func New(ctx mycontext.Context, userRepository user.Repository) Usecase {
 	return &usecase{
 		ctx:            ctx,
 		userRepository: userRepository,
@@ -99,4 +100,38 @@ func (uc *usecase) SignIn(input SignInInput) (SessionInfo, error) {
 		CreatedAt: s.CreatedAt(),
 		ExpiresAt: s.ExpiresAt(),
 	}, nil
+}
+
+func (uc *usecase) SignOut() error {
+	sid, ok := uc.ctx.SessionID()
+	if !ok {
+		return nil
+	}
+	ss, err := uc.sessionRepository.BulkGet([]session.ID{session.NewID(sid)})
+	if err != nil {
+		return errors.WrapPrefix(err, "session repository error", 1)
+	}
+	if len(ss) == 0 {
+		return nil
+	}
+	targetSession := ss[0]
+	stoken, ok := uc.ctx.SessionToken()
+	if !ok {
+		return errors.WrapPrefix(err, "missing token", 1)
+	}
+	if !uc.secureHasherService.IsSame(targetSession.HashedToken(), stoken) {
+		// TODO: needs to be able to handle errors more correctly, using ex. generics
+		return errors.New("invalid token")
+	}
+
+	now := time.Now()
+	if !targetSession.IsValid(now) {
+		return nil
+	}
+
+	targetSession.Invalidate(time.Now())
+	if err := uc.sessionRepository.BulkSave([]session.Session{targetSession}); err != nil {
+		return errors.WrapPrefix(err, "failed to save session", 1)
+	}
+	return nil
 }

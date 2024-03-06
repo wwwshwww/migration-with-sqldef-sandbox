@@ -10,6 +10,7 @@ CREATE TABLE sessions (
     user_id UUID NOT NULL,
     token_hash VARCHAR(255) NOT NULL,
     created_at TIMESTAMP NOT NULL,
+    activities_at TIMESTAMP NOT NULL,
     expires_at TIMESTAMP NOT NULL,
     CONSTRAINT fk_sessions_users FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );

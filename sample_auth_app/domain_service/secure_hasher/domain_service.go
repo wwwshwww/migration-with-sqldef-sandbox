@@ -4,7 +4,7 @@ import "golang.org/x/crypto/bcrypt"
 
 type SecureHasher interface {
 	Hash(plaintext string, options ...hashOption) (string, error)
-	IsSame(hash, password string) bool
+	IsSame(hash, plaintext string) bool
 }
 
 type secureHasher struct{}

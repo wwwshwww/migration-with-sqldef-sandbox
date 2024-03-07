@@ -6,6 +6,7 @@ import (
 	"example_app/sample_auth_app/domain/user/user"
 	"example_app/sample_auth_app/domain/user/user_finder"
 	"example_app/sample_auth_app/domain_service/secure_hasher"
+	"example_app/sample_auth_app/domain_service/user_validation_service"
 	"time"
 
 	"github.com/go-errors/errors"
@@ -18,17 +19,29 @@ type Usecase interface {
 }
 
 type usecase struct {
-	ctx                 mycontext.Context
-	userRepository      user.Repository
-	userFinder          user_finder.Finder
-	sessionRepository   session.Repository
-	secureHasherService secure_hasher.SecureHasher
+	ctx                   mycontext.Context
+	userRepository        user.Repository
+	userFinder            user_finder.Finder
+	sessionRepository     session.Repository
+	userValidationService user_validation_service.Service
+	secureHasherService   secure_hasher.SecureHasher
 }
 
-func New(ctx mycontext.Context, userRepository user.Repository) Usecase {
+func New(
+	ctx mycontext.Context,
+	userRepository user.Repository,
+	userFinder user_finder.Finder,
+	sessionRepository session.Repository,
+	userValidationService user_validation_service.Service,
+	secureHasherService secure_hasher.SecureHasher,
+) Usecase {
 	return &usecase{
-		ctx:            ctx,
-		userRepository: userRepository,
+		ctx:                   ctx,
+		userRepository:        userRepository,
+		userFinder:            userFinder,
+		sessionRepository:     sessionRepository,
+		userValidationService: userValidationService,
+		secureHasherService:   secureHasherService,
 	}
 }
 
@@ -36,22 +49,23 @@ func (uc *usecase) SignUp(input SignUpInput) error {
 	userId := user.GenerateID()
 	name, err := user.NewName(input.Name)
 	if err != nil {
-		return errors.Wrap(err, 1)
+		return errors.WrapPrefix(err, "Failed to create name", 1)
 	}
 	password, err := user.NewPassword(input.Password)
 	if err != nil {
-		return errors.Wrap(err, 1)
+		return errors.WrapPrefix(err, "Failed to create password", 1)
 	}
-	hashedPassword, err := uc.secureHasherService.Hash(password.Primitive())
+	u, err := user.Generate(userId, name, password, uc.secureHasherService)
 	if err != nil {
-		return errors.Wrap(err, 1)
+		return errors.WrapPrefix(err, "Failed to generate user", 1)
 	}
-	u, err := user.New(userId, name, hashedPassword)
-	if err != nil {
-		return errors.Wrap(err, 1)
+	if isDup, err := uc.userValidationService.CheckDuplicatedInExtSource([]user.User{u}); err != nil {
+		return errors.WrapPrefix(err, "Failed to check duplication in external source", 1)
+	} else if isDup[userId] {
+		return errors.New("Duplicated user name")
 	}
 	if err := uc.userRepository.Save(u); err != nil {
-		return errors.Wrap(err, 1)
+		return errors.WrapPrefix(err, "Failed to save user", 1)
 	}
 	return nil
 }
@@ -106,14 +120,14 @@ func (uc *usecase) SignOut() error {
 	if !ok {
 		return nil
 	}
+	stoken, ok := uc.ctx.SessionToken()
+	if !ok {
+		return errors.New("missing token")
+	}
+
 	targetSession, err := uc.sessionRepository.Get(session.NewID(sid))
 	if err != nil {
 		return errors.WrapPrefix(err, "session repository error", 1)
-	}
-
-	stoken, ok := uc.ctx.SessionToken()
-	if !ok {
-		return errors.WrapPrefix(err, "missing token", 1)
 	}
 	if !uc.secureHasherService.IsSame(targetSession.HashedToken(), stoken) {
 		// TODO: needs to be able to handle errors more correctly, using ex. generics

@@ -9,7 +9,7 @@ import (
 type User interface {
 	ID() ID
 	Name() Name
-	HashedPassword() string // 不可逆圧縮情報、平文との比較は可能
+	HashedPassword() string // 秘匿化されたパスワード。復号化不可。平文との比較は可能
 
 	ChangeName(Name) error
 	ChangePassword(Password, secure_hasher.SecureHasher) error

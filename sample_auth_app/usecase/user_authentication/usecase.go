@@ -50,7 +50,7 @@ func (uc *usecase) SignUp(input SignUpInput) error {
 	if err != nil {
 		return errors.Wrap(err, 1)
 	}
-	if err := uc.userRepository.BulkSave([]user.User{u}); err != nil {
+	if err := uc.userRepository.Save(u); err != nil {
 		return errors.Wrap(err, 1)
 	}
 	return nil
@@ -78,11 +78,10 @@ func (uc *usecase) SignIn(input SignInInput) (SessionInfo, error) {
 	}
 
 	loginUserID := userIds[0]
-	loginUsers, err := uc.userRepository.BulkGet([]user.ID{loginUserID})
+	loginUser, err := uc.userRepository.Get(loginUserID)
 	if err != nil {
 		return SessionInfo{}, errors.WrapPrefix(err, "Failed to get user", 1)
 	}
-	loginUser := loginUsers[0]
 	if !uc.secureHasherService.IsSame(loginUser.HashedPassword(), inputPassword.Primitive()) {
 		return SessionInfo{}, errors.New("Wrong password")
 	}
@@ -91,7 +90,7 @@ func (uc *usecase) SignIn(input SignInInput) (SessionInfo, error) {
 	if err != nil {
 		return SessionInfo{}, errors.WrapPrefix(err, "Failed to generate session", 1)
 	}
-	if err := uc.sessionRepository.BulkSave([]session.Session{s}); err != nil {
+	if err := uc.sessionRepository.Save(s); err != nil {
 		return SessionInfo{}, errors.WrapPrefix(err, "Failed to save session", 1)
 	}
 	return SessionInfo{
@@ -107,14 +106,11 @@ func (uc *usecase) SignOut() error {
 	if !ok {
 		return nil
 	}
-	ss, err := uc.sessionRepository.BulkGet([]session.ID{session.NewID(sid)})
+	targetSession, err := uc.sessionRepository.Get(session.NewID(sid))
 	if err != nil {
 		return errors.WrapPrefix(err, "session repository error", 1)
 	}
-	if len(ss) == 0 {
-		return nil
-	}
-	targetSession := ss[0]
+
 	stoken, ok := uc.ctx.SessionToken()
 	if !ok {
 		return errors.WrapPrefix(err, "missing token", 1)
@@ -128,9 +124,8 @@ func (uc *usecase) SignOut() error {
 	if !targetSession.IsValid(now) {
 		return nil
 	}
-
-	targetSession.Invalidate(time.Now())
-	if err := uc.sessionRepository.BulkSave([]session.Session{targetSession}); err != nil {
+	targetSession.Invalidate(now)
+	if err := uc.sessionRepository.Save(targetSession); err != nil {
 		return errors.WrapPrefix(err, "failed to save session", 1)
 	}
 	return nil

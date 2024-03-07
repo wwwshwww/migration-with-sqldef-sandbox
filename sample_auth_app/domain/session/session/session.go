@@ -17,7 +17,7 @@ const (
 type Session interface {
 	ID() ID
 	UserID() user.ID
-	HashedToken() string // 不可逆圧縮情報、平文との比較は可能
+	HashedToken() string // 秘匿化されたセキュリティトークン。復号化不可。平文との比較は可能
 	CreatedAt() time.Time
 	ActivitiesAt() time.Time
 	ExpiresAt() time.Time

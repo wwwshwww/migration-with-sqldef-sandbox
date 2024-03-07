@@ -12,6 +12,8 @@ vars:
     sh: echo $(pwd)/tool/postgres/schema.sql
   DB_SERVICE_NAME: sample-db
   SQLDEF_IMAGE_TAG: psqldef-runner
+
+  SWAG_VERSION: v1.16.3
   
 
 tasks:
@@ -37,3 +39,10 @@ tasks:
     cmds:
       - docker run --rm -it --network {{.DB_NETWORK_NAME}} -v {{.DB_SCHEMA_PATH}}:/schema.sql {{.SQLDEF_IMAGE_TAG}} sh -c "psqldef -h {{.DB_SERVICE_NAME}} -U root -W root {{.DB_NAME}} --enable-drop-table < schema.sql"
   
+  swag:
+    cmds:
+      - swag init -d ./sample_auth_app -o ./sample_auth_app/adapter/inbound/echo/docs
+  swag:docker:
+    describe: 使用不可。swag 公式イメージはバグってて動かないので自分で go install して実行してね
+    cmds:
+      - docker run --rm -v $(pwd):/code ghcr.io/swaggo/swag:{{.SWAG_VERSION}} init -d ./sample_auth_app -o ./sample_auth_app/adapter/inbound/echo/docs

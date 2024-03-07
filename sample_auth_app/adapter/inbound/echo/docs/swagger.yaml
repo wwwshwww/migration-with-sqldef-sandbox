@@ -1,0 +1,22 @@
+basePath: /api/v1
+host: localhost:1323
+info:
+  contact: {}
+  description: This is a sample server for Echo framework.
+  title: Sample App API
+  version: "1.0"
+paths:
+  /user/signup:
+    post:
+      consumes:
+      - application/json
+      description: you don't need session's id and token when request
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: ' '
+      summary: CreateNewUser
+      tags:
+      - user
+swagger: "2.0"

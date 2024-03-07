@@ -1,0 +1,33 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "This is a sample server for Echo framework.",
+        "title": "Sample App API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:1323",
+    "basePath": "/api/v1",
+    "paths": {
+        "/user/signup": {
+            "post": {
+                "description": "you don't need session's id and token when request",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "CreateNewUser",
+                "responses": {
+                    "204": {
+                        "description": " "
+                    }
+                }
+            }
+        }
+    }
+}
